@@ -203,6 +203,13 @@ main{padding:14px 0 96px}
 
 /* ══════════════ HEATMAPA ══════════════ */
 .hm .cell{cursor:default}
+.hm .cell.pick{cursor:pointer}
+.hm .cell.pick:active .n{transform:scale(.9)}
+.hm .cell.pick .n{transition:transform .1s}
+.hm .cell.pick::after{
+  content:'';position:absolute;inset:1px;border-radius:6px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);pointer-events:none;
+}
 .hm .cell .n{position:absolute;inset:2px;border-radius:5px;display:grid;place-items:center;font-size:.78rem;font-weight:800;font-family:'Barlow Condensed'}
 .hm-l1{background:rgba(232,50,26,.14);color:rgba(255,255,255,.45)}
 .hm-l2{background:rgba(245,166,35,.24);color:rgba(255,255,255,.7)}
@@ -249,6 +256,18 @@ main{padding:14px 0 96px}
 .listitem .g span{font-size:.8rem;color:var(--muted)}
 .copybox{display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:.78rem;word-break:break-all;margin-top:8px}
 .copybox code{flex:1;color:var(--muted);font-family:ui-monospace,monospace}
+
+/* zámek týdne */
+.lockbar{
+  display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:12px 14px;
+  border-radius:12px;background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.35);
+}
+.lockbar div{flex:1;min-width:0}
+.lockbar b{display:block;font-size:.92rem;color:#8ee9b3}
+.lockbar span{display:block;font-size:.78rem;color:var(--muted);line-height:1.35}
+.lockbar .btn{flex:none}
+.grid-scroll.locked .grid{opacity:.62;filter:saturate(.8)}
+.grid-scroll.locked .cell{cursor:not-allowed}
 
 /* souhrn nahoře na Termínech */
 .summary{
@@ -872,7 +891,12 @@ function viewAvailability(){
   ${weekNavHTML()}
 
   ${me.role==='operator'?`<div class="banner banner-info"><b>Operátor streamu</b>Označ hodiny, kdy můžeš u natáčení být. Termíny můžeš i potvrzovat a rozesílat pozvánky.</div>`:''}
-  ${isStudioRole
+
+  ${iDid ? `<div class="lockbar">
+      <div><b>🔒 Tenhle týden máš hotový</b><span>Aby ses omylem nepřeklikl, mřížka je zamčená.</span></div>
+      <button class="btn btn-sm" data-act="unlock">Upravit</button>
+    </div>`
+   : isStudioRole
     ? `<div class="banner banner-info"><b>Zadáváš dostupnost studia</b>Označ hodiny, kdy je studio volné. Ostatní to uvidí v mřížce i u návrhů termínů jako bonus.</div>`
     : `<div class="seg" style="margin-bottom:12px">
          <button class="${state.mode==='remote'?'on remote':''}" data-mode="remote">💻 Můžu na dálku</button>
@@ -880,7 +904,7 @@ function viewAvailability(){
        </div>
        <p class="hint" style="margin-bottom:10px">Studio znamená i call — nemusíš vyplňovat dvakrát.</p>`}
 
-  <div class="grid-scroll">
+  <div class="grid-scroll ${iDid?'locked':''}">
     <div class="grid" id="grid">
       <div class="gh gh-corner"></div>
       ${days.map(d=>{
@@ -903,9 +927,11 @@ function viewAvailability(){
     <span><i style="box-shadow:inset 0 0 0 2px rgba(46,204,113,.95);background:none"></i> můžou všichni</span>
     <span><i style="border:2px dashed rgba(255,255,255,.5);background:none"></i> už domluveno</span>
   </div>
-  <p class="hint mt">Klikni na buňku = přepnout. Podrž a táhni = vybrat víc hodin najednou. Klik na název dne = celý den.</p>
+  <p class="hint mt">${iDid
+    ? 'Týden je zamčený. Chceš něco změnit? Klikni nahoře na <b>Upravit</b>.'
+    : 'Klikni na buňku = přepnout. Podrž a táhni = vybrat víc hodin najednou. Klik na název dne = celý den.'}</p>
 
-  <div class="card mt">
+  ${iDid?'':`<div class="card mt">
     <h2>Zkratky</h2>
     <div class="row">
       <button class="btn btn-sm" data-act="copyprev">📋 Zkopírovat minulý týden</button>
@@ -913,13 +939,13 @@ function viewAvailability(){
       <button class="btn btn-sm" data-act="repeat">🔁 Opakovat každý týden</button>
       <button class="btn btn-sm btn-danger" data-act="clearweek">🧹 Vymazat týden</button>
     </div>
-  </div>
+  </div>`}
 
   <div class="card">
     <h2>Kdo už vyplnil tento týden<span class="sub">Čeká se na ty šedivé</span></h2>
     <div class="avatars" style="margin-bottom:14px">${fillers}</div>
-    <button class="btn btn-block ${iDid?'btn-ok':'btn-primary'}" data-act="done">
-      ${iDid?'✓ Máš vyplněno (klikni pro zrušení)':'Mám vyplněno tento týden'}
+    <button class="btn btn-block ${iDid?'':'btn-primary'}" data-act="${iDid?'unlock':'done'}">
+      ${iDid?'🔓 Odemknout a upravit':'✓ Mám vyplněno tento týden'}
     </button>
   </div>`;
 }
@@ -972,6 +998,13 @@ function bindGrid(){
   view.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>availAction(b.dataset.act));
 
   const grid=document.getElementById('grid'); if(!grid) return;
+
+  /* Týden označený jako hotový je zamčený — ať se nikdo omylem nepřeklikne */
+  if(weekDone(state.me,state.week)){
+    grid.addEventListener('click',()=>toast('Týden je zamčený — nahoře klikni na Upravit'));
+    return;
+  }
+
   const myMode=()=> meObj().role==='studio' ? 'studio' : state.mode;
 
   const cellAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.classList.contains('cell')?el:null; };
@@ -1085,6 +1118,7 @@ async function flushPaint(){
 }
 
 async function toggleDay(day){
+  if(weekDone(state.me,state.week)) return toast('Týden je zamčený — nahoře klikni na Upravit');
   const me=meObj(); const mode=me.role==='studio'?'studio':state.mode;
   const hs=hours().filter(h=>!isPast(day,h));
   const allSame=hs.length>0 && hs.every(h=>availAt(state.me,day,h)===mode);
@@ -1095,13 +1129,14 @@ async function toggleDay(day){
 async function availAction(act){
   const me=meObj(); const mode=me.role==='studio'?'studio':state.mode;
 
-  if(act==='done'){
+  if(act==='done' || act==='unlock'){
     const cur=weekDone(state.me,state.week);
     try{
       await DB.setWeekDone(state.me,state.week,!cur);
       const i=state.weekStatus.findIndex(w=>w.member_id===state.me&&w.week_start===state.week);
       if(i>=0) state.weekStatus[i].done=!cur; else state.weekStatus.push({member_id:state.me,week_start:state.week,done:!cur});
-      render(); toast(!cur?'Označeno jako vyplněné':'Zrušeno','ok');
+      state.keepScroll=true; render();
+      toast(!cur?'Hotovo — týden je zamčený 🔒':'Odemčeno, můžeš upravovat','ok');
     }catch(e){ toast('Nepovedlo se uložit','err'); }
     return;
   }
@@ -1385,7 +1420,7 @@ function viewSlots(){
   ${sections}
 
   <div class="card">
-    <h2>Heatmapa překryvů<span class="sub">Číslo = kolik moderátorů může. Fialový pruh = volné studio.</span></h2>
+    <h2>Heatmapa překryvů<span class="sub">Klikni na číslo a rovnou z něj uděláš termín (${state.filterDur} min)</span></h2>
     ${weekNavHTML()}
     <div class="grid-scroll">
       <div class="grid hm">
@@ -1404,6 +1439,7 @@ function viewSlots(){
       <span><i style="background:rgba(46,204,113,.75)"></i> všichni 4</span>
       <span><i style="background:var(--purple);height:4px"></i> volné studio</span>
     </div>
+    <p class="hint mt">Číslo v buňce = kolik moderátorů může. Klik na buňku otevře potvrzení termínu — hodí se, když chce termín vypsat operátor nebo studio.</p>
   </div>`;
 }
 
@@ -1416,11 +1452,14 @@ function heatCell(day,hour){
   const st=studioMember();
   const studioFree=!!(map && st && map.get(st.id));
   const cls=['cell']; if((hour-CONFIG.HOUR_FROM+1)%3===0) cls.push('h3');
-  if(isPast(day,hour)) cls.push('past');
-  if(slotBusy(day,hour)) cls.push('busy');
+  const past=isPast(day,hour), busy=slotBusy(day,hour);
+  if(past) cls.push('past');
+  if(busy) cls.push('busy');
+  const klik = n>0 && !past && !busy;
+  if(klik) cls.push('pick');
   const lvl=n===0?'':'hm-l'+Math.min(4,n);
-  return `<div class="${cls.join(' ')}">
-    ${n?`<div class="n ${lvl}">${n}${studioCnt===moderators().length?'':''}</div>`:''}
+  return `<div class="${cls.join(' ')}" ${klik?`data-heat="${day}|${hour}"`:''}>
+    ${n?`<div class="n ${lvl}">${n}</div>`:''}
     ${studioFree?'<div class="studiobar"></div>':''}
   </div>`;
 }
@@ -1439,6 +1478,16 @@ function bindSlots(){
     const info=blockInfo(day,+min/60,Math.ceil(state.filterDur/60))||{who:[],whoStudio:[],studioFree:false};
     openConfirmSheet({day, startMin:+min, dur:state.filterDur,
       participants:info.who, studioReady:info.studioFree && info.whoStudio.length===info.who.length && info.who.length>0});
+  });
+  /* klik přímo do heatmapy — termín vypíše i operátor nebo studio */
+  v.querySelectorAll('[data-heat]').forEach(b=>b.onclick=()=>{
+    const [day,hour]=b.dataset.heat.split('|');
+    const needH=Math.ceil(state.filterDur/60);
+    const info=blockInfo(day,+hour,needH);
+    if(!info) return toast('Sem se '+state.filterDur+'min natáčení nevejde — je tam už termín nebo konec dne','err');
+    if(!info.who.length) return toast('V tuhle hodinu nikdo nemůže','err');
+    openConfirmSheet({day, startMin:+hour*60, dur:state.filterDur, participants:info.who,
+      studioReady:info.studioFree && info.whoStudio.length===info.who.length});
   });
 }
 
@@ -1527,7 +1576,8 @@ function sessionCard(s,ctx){
   return `<div class="slot">
     <div class="slot-head">
       <div class="slot-date">${fmtDayFull(s.day)}
-        <small>${minLabel(s.start_min)} – ${minLabel(s.start_min+s.duration_min)} · ${esc(sessionTitle(s))}</small></div>
+        <small>${minLabel(s.start_min)} – ${minLabel(s.start_min+s.duration_min)} · ${esc(sessionTitle(s))}</small>
+        ${s.title?`<small style="color:var(--text);font-weight:600">📌 ${esc(s.title)}</small>`:''}</div>
       <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
         <span class="pill ${kindPill}">${inStudio(s)?'studio':s.kind==='guest'?'host':'call'}</span>
         <span class="pill pill-${s.status}">${s.status==='booked'?'zarezervováno':s.status==='confirmed'?'potvrzeno':'zrušeno'}</span>
@@ -1556,9 +1606,7 @@ function sessionCard(s,ctx){
       </div>`:''}
     ${s.calendar_link?`<p class="hint" style="margin-bottom:10px">📅 <a href="${esc(s.calendar_link)}" target="_blank" rel="noopener">Otevřít v Google Kalendáři</a></p>`:''}
     <div class="row">
-      ${s.status==='confirmed'?`
-        <button class="btn btn-sm btn-ok" data-send="${s.id}">📨 Odeslat pozvánku</button>
-        <button class="btn btn-sm" data-ics="${s.id}">⬇️ Stáhnout .ics</button>`:''}
+      ${s.status==='confirmed'?`<button class="btn btn-sm btn-ok" data-invite="${s.id}">📨 Pojmenovat a odeslat pozvánku</button>`:''}
       ${s.status==='booked'?`<button class="btn btn-sm" data-ics="${s.id}">⬇️ Stáhnout .ics</button>`:''}
       ${s.status!=='cancelled'?`<button class="btn btn-sm btn-danger" data-cancel="${s.id}">Zrušit</button>`:''}
     </div>
@@ -1593,7 +1641,7 @@ function sortSess(a,b){ return a.day===b.day ? a.start_min-b.start_min : (a.day<
 
 function bindBooked(){
   const v=document.getElementById('view');
-  v.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>sendInvite(b.dataset.send));
+  v.querySelectorAll('[data-invite]').forEach(b=>b.onclick=()=>openInviteSheet(b.dataset.invite));
   v.querySelectorAll('[data-ics]').forEach(b=>b.onclick=()=>downloadICS(b.dataset.ics));
   v.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>cancelSession(b.dataset.cancel));
   v.querySelectorAll('[data-eps]').forEach(inp=>inp.onchange=async()=>{
@@ -1682,12 +1730,68 @@ function inviteData(s){
   if(g){ desc+=`\nHost: ${g.name}${g.email?' ('+g.email+')':''}`; if(g.note) desc+=`\nPoznámka k hostovi: ${g.note}`; }
   desc+=`\nPočet dílů: ${s.episodes||1}`;
   desc+=`\n\nNaplánováno v appce Mistři světa — plánovač.`;
+  if(s.invite_note) desc = s.invite_note + '\n\n' + desc;
   return {
-    summary:`${CONFIG.SHOW_NAME} — natáčení${g?' s hostem '+g.name:''} (${inStudio(s)?'studio':s.kind==='guest'?'host':'call'})`,
+    summary: s.title || defaultTitle(s),
     description:desc,
     location:inStudio(s)?CONFIG.STUDIO_LOCATION:'Online',
     emails
   };
+}
+
+/* Předvyplněný název události — dá se přepsat před odesláním */
+function defaultTitle(s){
+  const g=s.guest_id?state.guests.find(x=>x.id===s.guest_id):null;
+  if(g) return `${CONFIG.SHOW_NAME} — rozhovor ${g.name}`;
+  return `${CONFIG.SHOW_NAME} — natáčení (${inStudio(s)?'studio':'call'})`;
+}
+
+/* Pojmenování události před odesláním pozvánky */
+function openInviteSheet(id){
+  const s=state.sessions.find(x=>x.id===id); if(!s) return;
+  const d=inviteData(s);
+  const sheet=openModal(`
+    <h3>Pozvánka do kalendáře</h3>
+    <p class="sheet-sub"><b>${esc(fmtDayLong(s.day))}, ${minLabel(s.start_min)}–${minLabel(s.start_min+s.duration_min)}</b>
+      · ${inStudio(s)?'ve studiu':'online'}</p>
+    <label class="fl">Název události</label>
+    <input type="text" id="iv-title" value="${esc(s.title||defaultTitle(s))}" placeholder="Např. Mistři světa #90 — streamyard">
+    <div class="chips mt" id="iv-presets">
+      <button class="chip btn-sm" data-t="${esc(CONFIG.SHOW_NAME)} #">#číslo dílu</button>
+      <button class="chip btn-sm" data-t="${esc(CONFIG.SHOW_NAME)} — streamyard">streamyard</button>
+      ${s.guest_id?`<button class="chip btn-sm" data-t="${esc(defaultTitle(s))}">rozhovor</button>`:''}
+    </div>
+    <label class="fl">Poznámka do pozvánky (nepovinné)</label>
+    <textarea id="iv-note" placeholder="Odkaz na streamyard, o čem se bude mluvit…">${esc(s.invite_note||'')}</textarea>
+    <label class="fl">Pozvánka půjde na (${d.emails.length})</label>
+    <div class="copybox" style="display:block"><code>${esc(d.emails.join(', '))||'nikdo nemá vyplněný e-mail'}</code></div>
+    <div class="sheet-actions" style="flex-direction:column">
+      <button class="btn btn-ok btn-block" data-x="send" ${d.emails.length?'':'disabled'}>📨 Odeslat pozvánku Googlem</button>
+      <button class="btn btn-block" data-x="ics">⬇️ Místo toho stáhnout .ics</button>
+      <button class="btn btn-ghost btn-block" data-x="close">Zpět</button>
+    </div>`);
+
+  const titleInput=sheet.querySelector('#iv-title');
+  sheet.querySelectorAll('#iv-presets [data-t]').forEach(b=>b.onclick=()=>{
+    titleInput.value=b.dataset.t; titleInput.focus();
+  });
+  const sber=()=>({title:titleInput.value.trim()||defaultTitle(s), note:sheet.querySelector('#iv-note').value.trim()});
+  sheet.querySelector('[data-x="close"]').onclick=closeModal;
+  sheet.querySelector('[data-x="ics"]').onclick=async()=>{
+    const {title,note}=sber(); closeModal();
+    await ulozNazev(s,title,note); downloadICS(s.id);
+  };
+  sheet.querySelector('[data-x="send"]').onclick=async()=>{
+    const {title,note}=sber(); closeModal();
+    await ulozNazev(s,title,note); await sendInvite(s.id);
+  };
+}
+
+/* Název ukládáme i do databáze; kdyby sloupec chyběl, pozvánka projde tak jako tak */
+async function ulozNazev(s,title,note){
+  s.title=title; s.invite_note=note||null;
+  try{ await DB.update('sessions',s.id,{title}); }
+  catch(e){ console.warn('Název se neuložil do DB (chybí sloupec title?)',e); }
 }
 
 async function sendInvite(id){

@@ -129,6 +129,7 @@ create table if not exists public.sessions (
   status            text not null default 'confirmed' check (status in ('confirmed','booked','cancelled')),
   episodes          int  not null default 1 check (episodes between 1 and 10),
   participants      text[] not null default '{}',   -- id moderátorů, kteří na termín dorazí
+  title             text,                            -- název události v kalendáři (zadá se před odesláním pozvánky)
   guest_id          uuid references public.guests(id) on delete set null,
   note              text,
   confirmed_by      text references public.members(id),
@@ -142,8 +143,9 @@ create table if not exists public.sessions (
   created_at        timestamptz not null default now()
 );
 
--- Pokud tabulka vznikla dřív, doplň sloupec s účastníky
+-- Pokud tabulka vznikla dřív, doplň novější sloupce
 alter table public.sessions add column if not exists participants text[] not null default '{}';
+alter table public.sessions add column if not exists title text;
 
 create index if not exists sessions_day_idx on public.sessions (day);
 
