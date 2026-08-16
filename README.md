@@ -71,6 +71,7 @@ souboru, který si každý naklikne do kalendáře sám.
    - `duda69@centrum.cz`
    - `jiritlusty11@gmail.com`
    - `jan.homolka@oneplaysport.cz`
+   - `fhillnash@gmail.com` (operátor streamu — taky může rozesílat pozvánky)
 
    (Jde i kliknout na *Publish app* — u interní appky bez ověření se pak jen při přihlášení objeví
    obrazovka „Google hasn't verified this app“ → *Advanced* → *Go to…*. Test users je čistší cesta.)
@@ -116,18 +117,16 @@ const CONFIG = {
 
 Nic jiného v souboru měnit nemusíš. Ulož.
 
-### Operátor streamu — doplň jméno a e-mail
+### Změna lidí v týmu
 
-Operátor je v seznamu zatím jako `Operátor streamu` **bez e-mailu**, takže mu pozvánky zatím nechodí.
-Až budeš znát jeho údaje, uprav je na **dvou místech**:
+Seznam lidí je natvrdo na **dvou místech** — když chceš změnit jméno, e-mail nebo barvu, uprav obě:
 
-- `supabase.sql` → řádek `('operator', 'Operátor streamu', null, …)` → doplň jméno a e-mail
-  a pusť SQL v Supabase znovu (skript to přepíše, nic nesmaže)
-- `index.html` → `MEMBERS_FALLBACK` → stejný řádek
+- `supabase.sql` → sekce `insert into public.members` → pak SQL v Supabase pusť znovu
+  (skript existující řádky přepíše, nic nesmaže)
+- `index.html` → `MEMBERS_FALLBACK` → stejné řádky
 
-Jakmile bude mít e-mail, přidává se **automaticky ke každé pozvánce**.
-
-Stejným způsobem se mění jména, e-maily i barvy ostatních.
+Aktuálně: 4 moderátoři, **Studio** (zadává volné termíny studia) a **Honza Vosecký** jako
+operátor streamu — ten se přidává **automaticky ke každé odeslané pozvánce**.
 
 ---
 
@@ -173,7 +172,7 @@ Do WhatsAppu stačí jedna zpráva:
 **Studio**: zástupci studia pošli stejný odkaz a řekni mu, ať si při výběru zvolí **Studio**.
 Zadává jen hodiny, kdy je studio volné. Není to podmínka termínu — bere se to jako bonus.
 
-**Operátor streamu**: stejný odkaz, při výběru zvolí **Operátor streamu**. Vidí celý kalendář,
+**Operátor streamu (Honza Vosecký)**: stejný odkaz, při výběru se zvolí. Vidí celý kalendář,
 zadává svoji dostupnost a může i potvrzovat termíny a rozesílat pozvánky. Do překryvu moderátorů
 se nezapočítává — u termínu se jen ukáže odznak *🎬 operátor může*.
 

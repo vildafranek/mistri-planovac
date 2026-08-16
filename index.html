@@ -339,8 +339,8 @@ const MEMBERS_FALLBACK = [
   {id:'jiri',   name:'Jiří Tlustý',   email:'jiritlusty11@gmail.com',      color:'#F5A623', role:'moderator', sort_order:3},
   {id:'honza',  name:'Honza Homolka', email:'jan.homolka@oneplaysport.cz', color:'#2ECC71', role:'moderator', sort_order:4},
   {id:'studio', name:'Studio',        email:null,                          color:'#9B59B6', role:'studio',    sort_order:5},
-  // ⬇️ doplň skutečné jméno a e-mail operátora streamu (kvůli pozvánkám) — a stejně tak v supabase.sql
-  {id:'operator', name:'Operátor streamu', email:null,                     color:'#00C2CB', role:'operator',  sort_order:6}
+  // operátor streamu — přidává se automaticky ke každé odeslané pozvánce
+  {id:'operator', name:'Honza Vosecký', email:'fhillnash@gmail.com',       color:'#00C2CB', role:'operator',  sort_order:6}
 ];
 
 const SUPA_READY = !CONFIG.SUPABASE_URL.startsWith('VLOZ') && !CONFIG.SUPABASE_ANON_KEY.startsWith('VLOZ');
@@ -688,7 +688,7 @@ function initPicker(){
     </button>`:'') +
     (op?`<button class="member-btn wide" data-id="${op.id}">
       <div class="avatar" style="background:${op.color}">🎬</div>
-      <span>Operátor streamu<br><small style="color:var(--muted);font-weight:500">stream a technika u natáčení</small></span>
+      <span>${esc(op.name)}<br><small style="color:var(--muted);font-weight:500">operátor streamu</small></span>
     </button>`:'');
   g.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{
     state.me=b.dataset.id; LS.set('ms_me',state.me); render(); show('screen-app');

@@ -25,14 +25,13 @@ alter table public.members drop constraint if exists members_role_check;
 alter table public.members add  constraint members_role_check
   check (role in ('moderator','studio','operator'));
 
--- POZOR: u operátora streamu doplň skutečné jméno a e-mail (kvůli pozvánkám)
 insert into public.members (id, name, email, color, role, sort_order) values
   ('vilem',    'Vilém Franěk',      'franek@closefriends.cz',      '#E8321A', 'moderator', 1),
   ('radek',    'Radek Duda',        'duda69@centrum.cz',           '#1B8CD6', 'moderator', 2),
   ('jiri',     'Jiří Tlustý',       'jiritlusty11@gmail.com',      '#F5A623', 'moderator', 3),
   ('honza',    'Honza Homolka',     'jan.homolka@oneplaysport.cz', '#2ECC71', 'moderator', 4),
   ('studio',   'Studio',            null,                          '#9B59B6', 'studio',    5),
-  ('operator', 'Operátor streamu',  null,                          '#00C2CB', 'operator',  6)
+  ('operator', 'Honza Vosecký',     'fhillnash@gmail.com',         '#00C2CB', 'operator',  6)
 on conflict (id) do update set
   name       = excluded.name,
   email      = excluded.email,
