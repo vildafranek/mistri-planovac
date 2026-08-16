@@ -8,7 +8,7 @@
 create extension if not exists "pgcrypto";
 
 -- ------------------------------------------------------------
--- 1) ČLENOVÉ (4 moderátoři + studio)
+-- 1) ČLENOVÉ (4 moderátoři + studio + operátor streamu)
 -- ------------------------------------------------------------
 create table if not exists public.members (
   id         text primary key,                 -- 'vilem', 'radek', ...

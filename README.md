@@ -1,7 +1,7 @@
 # Mistři světa — plánovač natáčení
 
 Interní webová appka pro domlouvání termínů natáčení podcastu. Každý si navolí dostupnost,
-appka sama najde termíny, kdy můžou všichni, a potvrzený termín pošle jako pozvánku do Google Kalendáře.
+appka sama najde termíny s největším překryvem a potvrzený termín pošle jako pozvánku do Google Kalendáře.
 
 **Co je uvnitř**
 
@@ -38,7 +38,7 @@ prohlížeče a nesdílí se. Na vyzkoušení stačí, na ostrý provoz ne.
 4. V levém menu **SQL Editor** → **New query**.
 5. Otevři soubor `supabase.sql`, zkopíruj **celý jeho obsah**, vlož do editoru a klikni **Run**
    (nebo Cmd/Ctrl + Enter).
-   Dole se má vypsat tabulka s 5 řádky — 4 moderátoři + Studio. Hotovo.
+   Dole se má vypsat tabulka s 6 řádky — 4 moderátoři, Studio a operátor streamu. Hotovo.
 6. Teď potřebuješ dva údaje:
    - V levém menu dole **Project Settings** (ozubené kolo) → **Data API** → zkopíruj **Project URL**
      (vypadá jako `https://abcdefghijkl.supabase.co`)
