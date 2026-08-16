@@ -160,7 +160,7 @@ main{padding:14px 0 96px}
 
 /* ══════════════ MŘÍŽKA ══════════════ */
 .grid-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--r);background:rgba(0,0,0,.2)}
-.grid{display:grid;grid-template-columns:44px repeat(7,minmax(42px,1fr));min-width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.grid{display:grid;grid-template-columns:34px repeat(7,minmax(41px,1fr));min-width:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .gh{
   position:sticky;top:0;z-index:3;background:var(--bg2);border-bottom:1px solid var(--border);
   padding:7px 2px;text-align:center;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;line-height:1.2;
@@ -174,22 +174,35 @@ main{padding:14px 0 96px}
   font-size:.7rem;color:var(--muted);display:flex;align-items:flex-start;justify-content:center;padding-top:2px;font-weight:600;
 }
 .cell{
-  height:38px;border-right:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);
+  height:46px;border-right:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);
   position:relative;background:rgba(255,255,255,.012);
 }
 .cell.h3{border-bottom-color:rgba(255,255,255,.12)}
-.cell .mine{position:absolute;inset:2px;border-radius:5px;background:var(--c);opacity:.92}
-/* "můžu i do studia" = plná barva + roh vpravo nahoře (dřív šrafování, bylo moc hlučné) */
-.cell .mine.studio::after{
-  content:'';position:absolute;top:0;right:0;width:0;height:0;
-  border-style:solid;border-width:0 11px 11px 0;
-  border-color:transparent rgba(255,255,255,.9) transparent transparent;
-  border-radius:0 5px 0 0;
+
+/* buňka = čtyři pevné čtvrtiny, každá patří jednomu moderátorovi (pořadí je pořád stejné) */
+.cell .qs{
+  position:absolute;inset:2px;display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  border-radius:5px;overflow:hidden;pointer-events:none;
 }
-.cell .others{position:absolute;left:0;right:0;bottom:2px;display:flex;justify-content:center;gap:2px;pointer-events:none}
-.cell .others i{width:7px;height:7px;border-radius:50%;background:var(--c);opacity:.9;box-shadow:0 0 0 1px rgba(0,0,0,.45)}
-.cell .others i.st{border-radius:2px;box-shadow:0 0 0 1.5px rgba(255,255,255,.6)}
-.cell .studiobar{position:absolute;top:2px;left:2px;right:2px;height:3px;border-radius:2px;background:var(--purple);opacity:.85}
+.cell .q{
+  position:relative;display:grid;place-items:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:0;
+  color:rgba(255,255,255,.1);background:rgba(255,255,255,.028);line-height:1;
+}
+.cell .q.on{background:var(--c);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+/* "může i do studia" = bílý roh */
+.cell .q.on.st::after{
+  content:'';position:absolute;top:0;right:0;width:0;height:0;
+  border-style:solid;border-width:0 7px 7px 0;
+  border-color:transparent rgba(255,255,255,.92) transparent transparent;
+}
+/* moje čtvrtina má bílý rámeček, ať vím, kde jsem */
+.cell .q.me{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.75)}
+.cell .q.me:not(.on){box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+
+.cell .studiobar{position:absolute;top:0;left:2px;right:2px;height:3px;border-radius:0 0 2px 2px;background:var(--purple);z-index:2}
+.cell .opbar{position:absolute;bottom:0;left:2px;right:2px;height:3px;border-radius:2px 2px 0 0;background:#00C2CB;z-index:2}
+.cell .studiobar.mine-bar,.cell .opbar.mine-bar{height:5px;box-shadow:0 0 0 1px rgba(255,255,255,.6)}
 .cell.past{background:rgba(0,0,0,.35)}
 /* překryv: hned v mřížce je vidět, kde se to sejde */
 .cell.ov3{box-shadow:inset 0 0 0 2px rgba(245,166,35,.6)}
@@ -918,11 +931,12 @@ function viewAvailability(){
     </div>
   </div>
   <div class="legend">
-    <span><i style="background:${me.color}"></i> moje volno</span>
-    ${!isStudioRole?`<span><i style="background:${me.color};position:relative;overflow:hidden"><b style="position:absolute;top:0;right:0;border-style:solid;border-width:0 6px 6px 0;border-color:transparent #fff transparent transparent"></b></i> i studio</span>`:''}
+    ${moderators().map(m=>`<span><i style="background:${m.color};border-radius:3px"></i> ${initials(m.name)} = ${esc(m.name.split(' ')[0])}</span>`).join('')}
+  </div>
+  <div class="legend">
+    <span><i style="background:${me.color};position:relative;overflow:hidden;border-radius:3px"><b style="position:absolute;top:0;right:0;border-style:solid;border-width:0 6px 6px 0;border-color:transparent #fff transparent transparent"></b></i> roh = i do studia</span>
     <span><i style="background:var(--purple);border-radius:2px;height:4px"></i> volné studio</span>
-    <span><i style="background:#666;border-radius:50%;width:8px;height:8px"></i> ostatní</span>
-    ${operatorMember()?`<span><i style="background:${operatorMember().color};border-radius:50%;width:8px;height:8px"></i> operátor</span>`:''}
+    ${operatorMember()?`<span><i style="background:${operatorMember().color};border-radius:2px;height:4px"></i> operátor</span>`:''}
     <span><i style="box-shadow:inset 0 0 0 2px rgba(245,166,35,.8);background:none"></i> můžou 3</span>
     <span><i style="box-shadow:inset 0 0 0 2px rgba(46,204,113,.95);background:none"></i> můžou všichni</span>
     <span><i style="border:2px dashed rgba(255,255,255,.5);background:none"></i> už domluveno</span>
@@ -950,20 +964,25 @@ function viewAvailability(){
   </div>`;
 }
 
-function cellHTML(day,hour,me){
-  const mine=availAt(me.id,day,hour);
+/* Vnitřek buňky: čtyři čtvrtiny s iniciálami (pořadí moderátorů je vždycky stejné)
+   + pruh nahoře = volné studio, pruh dole = operátor streamu. */
+function cellInner(day,hour,me){
   const map=state.availIdx.get(day+'|'+hour);
-  const st=studioMember();
-  let others='', studiobar='';
-  if(map){
-    for(const m of dotMembers()){
-      if(m.id===me.id) continue;
-      const v=map.get(m.id);
-      if(v) others+=`<i class="${v==='studio'?'st':''}" style="--c:${m.color}"></i>`;
-    }
-    if(st && me.id!==st.id && map.get(st.id)) studiobar='<div class="studiobar"></div>';
-    if(st && me.id===st.id && map.get(st.id)) studiobar='';
-  }
+  const st=studioMember(), op=operatorMember();
+  const qs=moderators().map(m=>{
+    const v=map?map.get(m.id):null;
+    const cls=['q']; if(v) cls.push('on'); if(v==='studio') cls.push('st'); if(m.id===me.id) cls.push('me');
+    return `<div class="${cls.join(' ')}" style="--c:${m.color}">${initials(m.name)}</div>`;
+  }).join('');
+  const studioOn = st && map && map.get(st.id);
+  const opOn     = op && map && map.get(op.id);
+  return `<div class="qs">${qs}</div>
+    ${studioOn?`<div class="studiobar ${me.id===st.id?'mine-bar':''}"></div>`:''}
+    ${opOn?`<div class="opbar ${op&&me.id===op.id?'mine-bar':''}"></div>`:''}`;
+}
+
+function cellHTML(day,hour,me){
+  const map=state.availIdx.get(day+'|'+hour);
   const cls=['cell'];
   if((hour-CONFIG.HOUR_FROM+1)%3===0) cls.push('h3');
   if(isPast(day,hour)) cls.push('past');
@@ -975,11 +994,7 @@ function cellHTML(day,hour,me){
     if(n>=mods.length) cls.push('ov4');
     else if(n>=3 && n>=mods.length-1) cls.push('ov3');
   }
-  return `<div class="${cls.join(' ')}" data-day="${day}" data-hour="${hour}">
-    ${mine?`<div class="mine ${mine==='studio'?'studio':''}" style="--c:${me.color}"></div>`:''}
-    ${studiobar}
-    ${others?`<div class="others">${others}</div>`:''}
-  </div>`;
+  return `<div class="${cls.join(' ')}" data-day="${day}" data-hour="${hour}">${cellInner(day,hour,me)}</div>`;
 }
 
 /* ── malování ── */
@@ -1098,12 +1113,12 @@ function setCell(day,hour,mode,el){
     pendingSet=pendingSet.filter(c=>!(c.day===day&&c.hour===hour));
   }
   if(el){
-    const old=el.querySelector('.mine'); if(old) old.remove();
-    if(mode){
-      const d=document.createElement('div');
-      d.className='mine '+(mode==='studio'?'studio':''); d.style.setProperty('--c',me.color);
-      el.insertBefore(d,el.firstChild);
-    }
+    el.innerHTML=cellInner(day,hour,me);
+    /* rámeček překryvu přepočítat hned, ať je vidět, když se tím sejdeme */
+    const mods=moderators(); let n=0;
+    for(const x of mods) if(m.get(x.id)) n++;
+    el.classList.toggle('ov4', n>=mods.length && !el.classList.contains('busy'));
+    el.classList.toggle('ov3', n>=3 && n<mods.length && n>=mods.length-1 && !el.classList.contains('busy'));
   }
 }
 
