@@ -777,6 +777,7 @@ async function startApp(){
 
   if(!state.me){ initPicker(); return; }
   render(); show('screen-app');
+  if(googleValid()) syncSessionsFromCalendar({silent:true});
 }
 
 /* ============================================================
@@ -809,7 +810,9 @@ function renderHeader(){
     : 'Kdo jsem?';
   chip.onclick=openMenu;
   document.getElementById('btn-refresh').onclick=async()=>{
-    toast('Načítám…'); await reload(true); render(); toast('Aktualizováno','ok');
+    toast('Načítám…'); await reload(true);
+    if(googleValid()) await syncSessionsFromCalendar({silent:true});
+    render(); toast('Aktualizováno','ok');
   };
 }
 
@@ -846,9 +849,9 @@ function openMenu(){
     const a=b.dataset.a;
     if(a==='close') return closeModal();
     if(a==='switch'){ closeModal(); initPicker(); }
-    if(a==='gin'){ closeModal(); await googleSignIn(); }
+    if(a==='gin'){ closeModal(); await googleSignIn(); render(); await syncSessionsFromCalendar({}); }
     if(a==='gout'){ googleSignOut(); closeModal(); render(); toast('Odhlášeno z Googlu'); }
-    if(a==='reload'){ closeModal(); await reload(true); render(); toast('Aktualizováno','ok'); }
+    if(a==='reload'){ closeModal(); await reload(true); if(googleValid()) await syncSessionsFromCalendar({silent:true}); render(); toast('Aktualizováno','ok'); }
     if(a==='logout'){
       closeModal();
       if(await confirmDialog({title:'Odhlásit se?',text:'Budeš muset znovu zadat přístupový kód.',ok:'Odhlásit',danger:true})){
@@ -1645,7 +1648,8 @@ function viewBooked(){
   </div>
 
   <div class="card">
-    <h2>Zarezervováno<span class="sub">Nadcházející natáčení</span></h2>
+    <h2>Zarezervováno<span class="sub">Nadcházející natáčení · kalendář je zdroj pravdy</span></h2>
+    ${GOOGLE_READY?`<p class="hint" style="margin-bottom:10px"><button class="btn btn-sm" data-sync-cal="1">↻ Srovnat s Google kalendářem</button></p>`:''}
     ${booked.length? booked.map(s=>sessionCard(s)).join('') : '<div class="empty">Zatím nic zarezervovaného.</div>'}
   </div>
 
@@ -1656,6 +1660,8 @@ function sortSess(a,b){ return a.day===b.day ? a.start_min-b.start_min : (a.day<
 
 function bindBooked(){
   const v=document.getElementById('view');
+  const syncBtn=v.querySelector('[data-sync-cal]');
+  if(syncBtn) syncBtn.onclick=()=>syncSessionsFromCalendar({});
   v.querySelectorAll('[data-invite]').forEach(b=>b.onclick=()=>openInviteSheet(b.dataset.invite));
   v.querySelectorAll('[data-ics]').forEach(b=>b.onclick=()=>downloadICS(b.dataset.ics));
   v.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>cancelSession(b.dataset.cancel));
@@ -1841,6 +1847,83 @@ async function sendInvite(id){
     console.error(e);
     toast('Odeslání selhalo: '+(e.message||e),'err');
   }
+}
+
+function slotFromGCal(ev){
+  if(!ev || ev.status==='cancelled') return {cancelled:true};
+  const raw=ev.start && ev.start.dateTime, rawEnd=ev.end && ev.end.dateTime;
+  if(!raw || !rawEnd) return null;
+  const start=new Date(raw), end=new Date(rawEnd);
+  const loc=ts=>{
+    const dtf=new Intl.DateTimeFormat('en-US',{timeZone:'Europe/Prague',hour12:false,
+      year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const p={}; for(const x of dtf.formatToParts(ts)) p[x.type]=x.value;
+    const hh=(p.hour==='24'?0:+p.hour);
+    return {day:p.year+'-'+p.month+'-'+p.day, min:hh*60+(+p.minute)};
+  };
+  const a=loc(start);
+  let dur=Math.round((end-start)/60000);
+  if(dur<15) dur=15;
+  if(dur>480) dur=480;
+  return {day:a.day, start_min:a.min, duration_min:dur, calendar_link:ev.htmlLink||null};
+}
+
+async function gcalGetEvent(eventId){
+  const r=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+encodeURIComponent(eventId),{
+    headers:{Authorization:'Bearer '+state.googleToken}
+  });
+  if(r.status===404 || r.status===410) return null;
+  const j=await r.json();
+  if(!r.ok) throw new Error(j.error?.message||('HTTP '+r.status));
+  return j;
+}
+
+async function syncSessionsFromCalendar({silent}={}){
+  if(!GOOGLE_READY) return 0;
+  try{
+    if(!googleValid()){
+      if(silent) return 0;
+      toast('Přihlašuji ke Googlu…');
+      await googleSignIn();
+    }
+  }catch(e){
+    if(!silent) toast('Přihlášení selhalo: '+e.message,'err');
+    return 0;
+  }
+  const rows=state.sessions.filter(s=>s.status==='booked' && s.calendar_event_id);
+  if(!rows.length){
+    if(!silent) toast('Žádné rezervace s Google událostí');
+    return 0;
+  }
+  if(!silent) toast('Srovnávám s kalendářem…');
+  let n=0, miss=0;
+  for(const s of rows){
+    try{
+      const ev=await gcalGetEvent(s.calendar_event_id);
+      if(!ev){ miss++; continue; }
+      const slot=slotFromGCal(ev);
+      if(!slot) continue;
+      if(slot.cancelled) continue;
+      const same=s.day===slot.day && +s.start_min===+slot.start_min && +s.duration_min===+slot.duration_min;
+      if(same && (!slot.calendar_link || s.calendar_link===slot.calendar_link)) continue;
+      const clash=state.sessions.find(x=>x.id!==s.id && x.status!=='cancelled' && x.day===slot.day && +x.start_min===+slot.start_min);
+      if(clash){
+        console.warn('Kalendář chce slot, který už má jiný termín', s.id, clash.id);
+        continue;
+      }
+      const patch={day:slot.day, start_min:slot.start_min, duration_min:slot.duration_min};
+      if(slot.calendar_link) patch.calendar_link=slot.calendar_link;
+      await DB.update('sessions',s.id,patch);
+      Object.assign(s,patch);
+      n++;
+    }catch(e){ console.warn('sync session', s.id, e); }
+  }
+  if(n) render();
+  if(!silent){
+    if(n) toast('Upraveno podle kalendáře: '+n,'ok');
+    else toast(miss?'Kalendář nenašel některé události (jiný účet?)':'Časy sedí s kalendářem','ok');
+  }else if(n) toast('Kalendář posunul '+n+' termín'+(n>1?'ů':''),'ok');
+  return n;
 }
 
 function downloadICS(id){
