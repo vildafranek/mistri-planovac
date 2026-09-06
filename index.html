@@ -772,11 +772,16 @@ function initGate(){
 function initPicker(){
   show('screen-picker');
   const g=document.getElementById('picker-grid');
-  const mods=moderators(), st=studioMember(), op=operatorMember();
+  const mods=moderators(), st=studioMember(), op=operatorMember(), extras=extraMembers();
+  const formatProClena = id => (CONFIG.FORMATY.find(f=>(f.musi||[]).includes(id))||{}).nazev || 'vedlejší pořad';
   g.innerHTML = mods.map(m=>`
     <button class="member-btn" data-id="${m.id}">
       <div class="avatar" style="background:${m.color}">${initials(m.name)}</div>
       <span>${esc(m.name)}</span>
+    </button>`).join('') +
+    extras.map(m=>`<button class="member-btn wide" data-id="${m.id}">
+      <div class="avatar" style="background:${m.color}">${initials(m.name)}</div>
+      <span>${esc(m.name)}<br><small style="color:var(--muted);font-weight:500">${esc(formatProClena(m.id))}</small></span>
     </button>`).join('') +
     (st?`<button class="member-btn wide" data-id="${st.id}">
       <div class="avatar" style="background:${st.color}">🎙</div>
@@ -993,7 +998,13 @@ function viewAvailability(){
 
   <div class="card">
     <h2>Kdo už vyplnil tento týden<span class="sub">Čeká se na ty šedivé</span></h2>
-    <div class="avatars" style="margin-bottom:14px">${fillers}</div>
+    <div class="avatars" style="margin-bottom:8px">${fillers}</div>
+    ${extraMembers().length?`<div class="avatars" style="margin-bottom:14px;opacity:.85">
+      <span class="hint" style="margin-right:2px">vedlejší:</span>
+      ${extraMembers().map(m=>{
+        const on=weekDone(m.id,state.week);
+        return `<span class="avatar sm ${on?'':'off'}" style="background:${m.color}" title="${esc(m.name)}">${on?'✓':initials(m.name)}</span>`;
+      }).join('')}</div>`:''}
     <button class="btn btn-block ${iDid?'':'btn-primary'}" data-act="${iDid?'unlock':'done'}">
       ${iDid?'🔓 Odemknout a upravit':'✓ Mám vyplněno tento týden'}
     </button>
