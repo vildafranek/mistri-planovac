@@ -157,6 +157,8 @@ main{padding:14px 0 96px}
 .seg button.on.remote{background:rgba(27,140,214,.28);color:#a9dcfa}
 .seg button.on.studio{background:rgba(155,89,182,.3);color:#e0bdf0}
 .seg.three{grid-template-columns:repeat(3,1fr)}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+.seg.four button{padding:11px 4px;font-size:.8rem}
 
 /* ══════════════ MŘÍŽKA ══════════════ */
 .grid-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--r);background:rgba(0,0,0,.2)}
@@ -174,7 +176,7 @@ main{padding:14px 0 96px}
   font-size:.7rem;color:var(--muted);display:flex;align-items:flex-start;justify-content:center;padding-top:2px;font-weight:600;
 }
 .cell{
-  height:46px;border-right:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);
+  height:56px;border-right:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);
   position:relative;background:rgba(255,255,255,.012);
 }
 .cell.h3{border-bottom-color:rgba(255,255,255,.12)}
@@ -184,6 +186,10 @@ main{padding:14px 0 96px}
   position:absolute;inset:2px;display:grid;grid-template-columns:1fr 1fr;gap:1px;
   border-radius:5px;overflow:hidden;pointer-events:none;
 }
+/* třetí, nižší řada = vedlejší pořady (Maxa liga, NHL) */
+.cell .qs.rows3{grid-template-rows:1fr 1fr .72fr}
+.cell .q.extra{font-size:8.5px;border-top:1px solid rgba(0,0,0,.5)}
+.cell .q.extra:not(.on){color:rgba(255,255,255,.07);background:rgba(255,255,255,.015)}
 .cell .q{
   position:relative;display:grid;place-items:center;
   font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:0;
@@ -392,7 +398,14 @@ const CONFIG = {
   // 8) Místo studiového natáčení (vyplní se do pozvánky)
   STUDIO_LOCATION: 'Studio — Praha',
   // 9) Název podcastu v pozvánce
-  SHOW_NAME: 'Mistři světa'
+  SHOW_NAME: 'Mistři světa',
+  // 10) Pořady. 'kdo' = koho počítat do překryvu (null = všechny včetně vedlejších),
+  //     'musi' = kdo u termínu nesmí chybět.
+  FORMATY: [
+    {id:'main', nazev:'Mistři světa', popis:'hlavní čtyřka',        kdo:['vilem','radek','jiri','honza'], musi:[]},
+    {id:'maxa', nazev:'Maxa liga',    popis:'nesmí chybět Vrábel',  kdo:null, musi:['vrabel']},
+    {id:'nhl',  nazev:'NHL',          popis:'nesmí chybět Vacek',    kdo:null, musi:['vacek']}
+  ]
 };
 
 /* Záložní seznam členů — použije se v ukázkovém režimu (bez Supabase)
@@ -402,9 +415,12 @@ const MEMBERS_FALLBACK = [
   {id:'radek',  name:'Radek Duda',    email:'duda69@centrum.cz',           color:'#1B8CD6', role:'moderator', sort_order:2},
   {id:'jiri',   name:'Jiří Tlustý',   email:'jiritlusty11@gmail.com',      color:'#F5A623', role:'moderator', sort_order:3},
   {id:'honza',  name:'Honza Homolka', email:'jan.homolka@oneplaysport.cz', color:'#2ECC71', role:'moderator', sort_order:4},
-  {id:'studio', name:'Studio',        email:null,                          color:'#9B59B6', role:'studio',    sort_order:5},
+  // vedlejší pořady (Maxa liga, NHL) — nepočítají se do hlavní čtyřky
+  {id:'vacek',  name:'Jan Vacek',     email:null,                          color:'#E056A0', role:'extra',     sort_order:5},
+  {id:'vrabel', name:'Tomáš Vrábel',  email:null,                          color:'#A0D911', role:'extra',     sort_order:6},
+  {id:'studio', name:'Studio',        email:null,                          color:'#9B59B6', role:'studio',    sort_order:7},
   // operátor streamu — přidává se automaticky ke každé odeslané pozvánce
-  {id:'operator', name:'Honza Vosecký', email:'fhillnash@gmail.com',       color:'#00C2CB', role:'operator',  sort_order:6}
+  {id:'operator', name:'Honza Vosecký', email:'fhillnash@gmail.com',       color:'#00C2CB', role:'operator',  sort_order:8}
 ];
 
 const SUPA_READY = !CONFIG.SUPABASE_URL.startsWith('VLOZ') && !CONFIG.SUPABASE_ANON_KEY.startsWith('VLOZ');
@@ -634,6 +650,7 @@ const state = {
   availIdx: new Map(),
   filterDur: 90,
   filterMin: CONFIG.MIN_PEOPLE_DEFAULT,
+  format: 'main',
   googleToken: null, googleExp: 0,
   busy: false
 };
@@ -641,6 +658,21 @@ const state = {
 function moderators(){ return state.members.filter(m=>m.role==='moderator').sort((a,b)=>a.sort_order-b.sort_order); }
 function studioMember(){ return state.members.find(m=>m.role==='studio'); }
 function operatorMember(){ return state.members.find(m=>m.role==='operator'); }
+/* lidé od vedlejších pořadů (Maxa liga, NHL) — mimo klíčovou čtyřku */
+function extraMembers(){ return state.members.filter(m=>m.role==='extra').sort((a,b)=>a.sort_order-b.sort_order); }
+/* koho kreslit do buňky: hlavní čtyřka + vedlejší */
+function gridMembers(){ return moderators().concat(extraMembers()); }
+
+/* aktuálně zvolený pořad a jeho sestava */
+function aktivniFormat(){ return CONFIG.FORMATY.find(f=>f.id===state.format) || CONFIG.FORMATY[0]; }
+function crewMembers(){
+  const f=aktivniFormat();
+  return f.kdo ? f.kdo.map(id=>memberById(id)).filter(Boolean) : gridMembers();
+}
+function povinni(){ return (aktivniFormat().musi||[]).filter(id=>memberById(id)); }
+
+/* od kolika lidí se hodina zvýrazní oranžově (zelená = celá čtyřka) */
+function skoroVsichni(){ const t=moderators().length; return Math.max(3, t-1); }
 /* Do mřížky se jako "ostatní" kreslí moderátoři + operátor (studio má vlastní pruh) */
 function dotMembers(){ return state.members.filter(m=>m.role==='moderator'||m.role==='operator').sort((a,b)=>a.sort_order-b.sort_order); }
 function memberById(id){ return state.members.find(m=>m.id===id); }
@@ -932,12 +964,13 @@ function viewAvailability(){
   </div>
   <div class="legend">
     ${moderators().map(m=>`<span><i style="background:${m.color};border-radius:3px"></i> ${initials(m.name)} = ${esc(m.name.split(' ')[0])}</span>`).join('')}
+    ${extraMembers().map(m=>`<span style="opacity:.85"><i style="background:${m.color};border-radius:3px;height:9px"></i> ${initials(m.name)} = ${esc(m.name.split(' ')[0])} <b style="color:var(--muted2);font-weight:600">(vedlejší)</b></span>`).join('')}
   </div>
   <div class="legend">
     <span><i style="background:${me.color};position:relative;overflow:hidden;border-radius:3px"><b style="position:absolute;top:0;right:0;border-style:solid;border-width:0 6px 6px 0;border-color:transparent #fff transparent transparent"></b></i> roh = i do studia</span>
     <span><i style="background:var(--purple);border-radius:2px;height:4px"></i> volné studio</span>
     ${operatorMember()?`<span><i style="background:${operatorMember().color};border-radius:2px;height:4px"></i> operátor</span>`:''}
-    <span><i style="box-shadow:inset 0 0 0 2px rgba(245,166,35,.8);background:none"></i> můžou 3</span>
+    <span><i style="box-shadow:inset 0 0 0 2px rgba(245,166,35,.8);background:none"></i> můžou ${skoroVsichni()}+</span>
     <span><i style="box-shadow:inset 0 0 0 2px rgba(46,204,113,.95);background:none"></i> můžou všichni</span>
     <span><i style="border:2px dashed rgba(255,255,255,.5);background:none"></i> už domluveno</span>
   </div>
@@ -969,14 +1002,15 @@ function viewAvailability(){
 function cellInner(day,hour,me){
   const map=state.availIdx.get(day+'|'+hour);
   const st=studioMember(), op=operatorMember();
-  const qs=moderators().map(m=>{
+  const qs=gridMembers().map(m=>{
     const v=map?map.get(m.id):null;
-    const cls=['q']; if(v) cls.push('on'); if(v==='studio') cls.push('st'); if(m.id===me.id) cls.push('me');
+    const cls=['q']; if(v) cls.push('on'); if(v==='studio') cls.push('st');
+    if(m.id===me.id) cls.push('me'); if(m.role==='extra') cls.push('extra');
     return `<div class="${cls.join(' ')}" style="--c:${m.color}">${initials(m.name)}</div>`;
   }).join('');
   const studioOn = st && map && map.get(st.id);
   const opOn     = op && map && map.get(op.id);
-  return `<div class="qs">${qs}</div>
+  return `<div class="qs ${gridMembers().length>4?'rows3':''}">${qs}</div>
     ${studioOn?`<div class="studiobar ${me.id===st.id?'mine-bar':''}"></div>`:''}
     ${opOn?`<div class="opbar ${op&&me.id===op.id?'mine-bar':''}"></div>`:''}`;
 }
@@ -992,7 +1026,7 @@ function cellHTML(day,hour,me){
     const mods=moderators(); let n=0;
     if(map) for(const m of mods) if(map.get(m.id)) n++;
     if(n>=mods.length) cls.push('ov4');
-    else if(n>=3 && n>=mods.length-1) cls.push('ov3');
+    else if(n>=skoroVsichni()) cls.push('ov3');
   }
   return `<div class="${cls.join(' ')}" data-day="${day}" data-hour="${hour}">${cellInner(day,hour,me)}</div>`;
 }
@@ -1118,7 +1152,7 @@ function setCell(day,hour,mode,el){
     const mods=moderators(); let n=0;
     for(const x of mods) if(m.get(x.id)) n++;
     el.classList.toggle('ov4', n>=mods.length && !el.classList.contains('busy'));
-    el.classList.toggle('ov3', n>=3 && n<mods.length && n>=mods.length-1 && !el.classList.contains('busy'));
+    el.classList.toggle('ov3', n>=skoroVsichni() && n<mods.length && !el.classList.contains('busy'));
   }
 }
 
@@ -1309,7 +1343,7 @@ function blockInfo(day,startHour,needH){
     if(h>=CONFIG.HOUR_TO || isPast(day,h) || slotBusy(day,h)) return null;
   }
   const who=[], whoStudio=[];
-  for(const m of moderators()){
+  for(const m of crewMembers()){
     let all=true, allStudio=true;
     for(let k=0;k<needH;k++){
       const v=availAt(m.id,day,startHour+k);
@@ -1325,7 +1359,9 @@ function blockInfo(day,startHour,needH){
   const op=operatorMember();
   let opFree=!!op;
   for(let k=0;k<needH && opFree;k++) if(!availAt(op.id,day,startHour+k)) opFree=false;
-  return {who,whoStudio,studioFree,opFree};
+  /* u vedlejších pořadů musí být přítomný ten, kdo je moderuje */
+  const chybiPovinny = povinni().some(id=>!who.includes(id));
+  return {who,whoStudio,studioFree,opFree,chybiPovinny};
 }
 
 /* Vrátí bloky termínů. Sousední začátky se stejnou sestavou se slučují do jedné karty. */
@@ -1339,7 +1375,7 @@ function findCandidates(durationMin,minPeople){
     let cur=null;
     for(const h of hours()){
       const info=blockInfo(iso,h,needH);
-      const ok = info && info.who.length>=minPeople;
+      const ok = info && !info.chybiPovinny && info.who.length>=minPeople;
       if(ok){
         const key=info.who.join(',')+'|'+info.whoStudio.join(',')+'|'+info.studioFree+'|'+info.opFree;
         if(cur && cur.key===key && cur.starts[cur.starts.length-1]===h-1) cur.starts.push(h);
@@ -1353,7 +1389,7 @@ function findCandidates(durationMin,minPeople){
 }
 
 function candidateCard(c){
-  const mods=moderators(), total=mods.length;
+  const mods=crewMembers(), total=mods.length;
   const n=c.who.length;
   const bonus=[];
   if(c.studioFree) bonus.push(`<span class="pill pill-studio">🎙 studio volné</span>`);
@@ -1380,11 +1416,17 @@ function candidateCard(c){
   </div>`;
 }
 
+/* nabídka pro filtr "kolik nás musí být" — u větší party dává smysl i 4+ */
+function minVolby(){
+  const t=crewMembers().length;
+  return [...new Set([2,3,4,t].filter(n=>n>=2&&n<=t))].sort((a,b)=>a-b).slice(-4);
+}
+
 /* 1 shoda / 2–4 shody / 5+ shod */
 function shodySlovo(n){ return n===1?'shodu':(n>=2&&n<=4)?'shody':'shod'; }
 
 function viewSlots(){
-  const total=moderators().length;
+  const total=crewMembers().length;
   const cands=findCandidates(state.filterDur, state.filterMin);
   const days=weekDays(state.week);
 
@@ -1395,13 +1437,14 @@ function viewSlots(){
     <div class="summary ${plny?'good':''}">
       <b>${cands.length===1?'Máme 1 shodu!':'Máme '+cands.length+' '+shodySlovo(cands.length)+'!'}</b>
       <span>
+        ${esc(aktivniFormat().nazev)} ·
         ${plny?`${plny}× můžete všichni ${total} · `:''}${state.filterDur} min ·
         nejbližší <b>${fmtDayFull(prvni.day)}</b> od ${prvni.starts[0]}:00
       </span>
     </div>` : `
     <div class="summary bad">
       <b>Zatím žádná shoda</b>
-      <span>Pro ${state.filterMin===total?'všechny '+total:'aspoň '+state.filterMin+' lidi'} a ${state.filterDur} min se nic nenašlo. Zkus povolit míň lidí nebo kratší natáčení.</span>
+      <span>${esc(aktivniFormat().nazev)}: pro ${state.filterMin===total?'všechny '+total:'aspoň '+state.filterMin+' lidi'} a ${state.filterDur} min se nic nenašlo. Zkus povolit míň lidí nebo kratší natáčení.</span>
     </div>`;
 
   /* skupiny podle počtu lidí: nejlepší (všichni) nahoře */
@@ -1421,13 +1464,18 @@ function viewSlots(){
   ${summary}
   <div class="card">
     <h2>Kandidáti na natáčení<span class="sub">Souvislé bloky seřazené od nejlepších</span></h2>
+    <label class="fl">Pořad</label>
+    <div class="seg ${CONFIG.FORMATY.length===3?'three':''}">
+      ${CONFIG.FORMATY.map(f=>`<button class="${state.format===f.id?'on':''}" data-format="${f.id}">${esc(f.nazev)}</button>`).join('')}
+    </div>
+    <p class="hint" style="margin-top:6px">${esc(aktivniFormat().popis)}${povinni().length?' · hledám jen termíny, kdy může':''}</p>
     <label class="fl">Délka natáčení</label>
     <div class="seg three">
       ${[60,90,120].map(d=>`<button class="${state.filterDur===d?'on':''}" data-dur="${d}">${d} min</button>`).join('')}
     </div>
     <label class="fl">Kolik nás musí minimálně být</label>
-    <div class="seg three">
-      ${[2,3,4].map(n=>`<button class="${state.filterMin===n?'on':''}" data-min="${n}">${n===total?'všichni '+n:n+' a víc'}</button>`).join('')}
+    <div class="seg ${minVolby().length===4?'four':'three'}">
+      ${minVolby().map(n=>`<button class="${state.filterMin===n?'on':''}" data-min="${n}">${n===total?'všichni '+n:n+'+'}</button>`).join('')}
     </div>
     <p class="hint mt">Studio řešit nemusíš — když zrovna vyjde, uvidíš u termínu odznak <b>🎙 studio volné</b> jako bonus. Typ natáčení (call / studio) vybereš až při potvrzení.</p>
   </div>
@@ -1462,7 +1510,7 @@ function heatCell(day,hour){
   const map=state.availIdx.get(day+'|'+hour);
   let n=0, studioCnt=0;
   if(map){
-    for(const m of moderators()){ const v=map.get(m.id); if(v){ n++; if(v==='studio') studioCnt++; } }
+    for(const m of crewMembers()){ const v=map.get(m.id); if(v){ n++; if(v==='studio') studioCnt++; } }
   }
   const st=studioMember();
   const studioFree=!!(map && st && map.get(st.id));
@@ -1483,6 +1531,12 @@ function bindSlots(){
   const v=document.getElementById('view');
   v.querySelectorAll('[data-dur]').forEach(b=>b.onclick=()=>{ state.filterDur=+b.dataset.dur; render(); });
   v.querySelectorAll('[data-min]').forEach(b=>b.onclick=()=>{ state.filterMin=+b.dataset.min; render(); });
+  v.querySelectorAll('[data-format]').forEach(b=>b.onclick=()=>{
+    state.format=b.dataset.format;
+    const max=crewMembers().length;
+    if(state.filterMin>max) state.filterMin=max;      // ať filtr nezůstane nesplnitelný
+    render();
+  });
   v.querySelectorAll('[data-week]').forEach(b=>b.onclick=()=>{
     const x=+b.dataset.week;
     state.week = x===0 ? toISO(mondayOf(new Date())) : toISO(addDays(fromISO(state.week),x*7));
@@ -1508,7 +1562,7 @@ function bindSlots(){
 
 /* Potvrzení termínu — tady se teprve volí, jestli to bude call nebo studio */
 function openConfirmSheet({day,startMin,dur,participants,studioReady,guestId,guestName}){
-  const mods=moderators();
+  const mods=gridMembers();
   let kind = guestId ? 'guest' : (studioReady ? 'studio' : 'call');
   let place = studioReady ? 'studio' : 'call';   // u hostovského dílu se řeší zvlášť
   const label=`${fmtDayLong(day)}, ${minLabel(startMin)}–${minLabel(startMin+dur)}`;
@@ -1599,7 +1653,7 @@ function sessionCard(s,ctx){
       </div>
     </div>
     <div class="avatars" style="margin-bottom:10px">
-      ${moderators().map(m=>{
+      ${gridMembers().map(m=>{
         const on=people.some(p=>p.id===m.id);
         return `<span class="avatar sm ${on?'':'off'}" style="background:${m.color}" title="${esc(m.name)}${on?'':' — nedorazí'}">${initials(m.name)}</span>`;
       }).join('')}
@@ -1727,7 +1781,7 @@ function googleSignIn(){
 
 function sessionParticipants(s){
   const ids=(s.participants&&s.participants.length)?s.participants:moderators().map(m=>m.id);
-  return moderators().filter(m=>ids.includes(m.id));
+  return gridMembers().filter(m=>ids.includes(m.id));
 }
 function inStudio(s){ return s.kind==='studio' || (s.kind==='guest' && s.note==='studio'); }
 
